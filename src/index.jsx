@@ -1,3 +1,6 @@
+import 'react-app-polyfill/ie11';
+import 'react-app-polyfill/stable';
+// import 'fast-text-encoding/text';
 import React from 'react';
 import ReactDOM from 'react-dom';
 import {Provider} from 'react-redux';
@@ -6,17 +9,16 @@ import * as serviceWorker from './serviceWorker';
 import store from './store';
 import Services from './services';
 import {ServiceProvider} from './components/ServicesContext';
-import App from './components/App/App';
+import AppContainer from './containers/AppContainer/AppContainer';
 import 'semantic-ui-css/semantic.min.css';
-import './index.css';
-
+import './index.scss';
 const services = new Services();
 
 ReactDOM.render(
     <BrowserRouter>
         <Provider store={store}>
             <ServiceProvider value={services}>
-                <App/>
+                <AppContainer/>
             </ServiceProvider>
         </Provider>
     </BrowserRouter>,

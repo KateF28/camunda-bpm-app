@@ -2,22 +2,29 @@ import {
     GET_TASKLIST_REQUEST,
     GET_TASKLIST_FAILURE,
     GET_TASKSDATA_SUCCESS,
-    CREATE_TASK_SUCCESS,
     DELETE_TASK,
-    SET_CURRENT_ITEMS_PART
+    SET_CURRENT_ITEMS_PART,
+    SET_LOADING
 } from '../constants/tasklist';
 
-const addVariablesToTasks = ({tasklistData, tasksVariables}) => {
-    tasklistData.forEach(task => {
-        let chosenTask = tasksVariables.find(el => el.id === task.id);
-        for (let key in chosenTask) {
-            if (chosenTask.hasOwnProperty(key)) {
-                task[key] = chosenTask[key]
+const addDataToTasks = (data) => {
+    let fullTasklistData = data.tasklistData;
+    fullTasklistData.forEach(task => {
+        const chosenTaskVariables = data.tasksVariables && data.tasksVariables.find(el => el.id === task.id);
+        for (let key in chosenTaskVariables) {
+            if (chosenTaskVariables.hasOwnProperty(key)) {
+                task[key] = chosenTaskVariables[key];
             }
         }
+        if (data.tasksXml) {
+        const neededXml = data.tasksXml.find(el => el.id === task.id).taskXmlData.firstElementChild;
+        if (neededXml !== undefined) {
+            task.nameFromXml = Array.from(neededXml.attributes).find(elem => elem.nodeName === "name").nodeValue;
+        }
+    }
         return task;
     })
-    return [...tasklistData];
+    return fullTasklistData;
 };
 
 const deleteTaskById = (id, stateList) => {
@@ -40,11 +47,17 @@ const updateTasklist = (state, action) => {
             return {...state.tasklist, loading: true};
         case GET_TASKSDATA_SUCCESS:
             return {
-                loading: false,
+                ...state.tasklist,
+                // loading: false,
                 error: null,
                 currentItemsPart: 1,
                 currentPartsPortion: 1,
-                list: addVariablesToTasks(action.payload),
+                list: addDataToTasks(action.payload),
+            };
+        case SET_LOADING:
+            return {
+                ...state.tasklist,
+                loading: action.payload,
             };
         case SET_CURRENT_ITEMS_PART:
             return {
@@ -54,23 +67,15 @@ const updateTasklist = (state, action) => {
                 currentItemsPart: action.payload.part,
                 currentPartsPortion: action.payload.portion
             };
-        // case SET_CURRENT_PARTS_PORTION:
+        // case CREATE_TASK_SUCCESS:
         //     return {
         //         ...state.tasklist,
         //         loading: false,
         //         error: null,
-        //         currentPartsPortion: action.payload
+        //         list: [...state.tasklist.list, action.payload],
         //     };
-        case CREATE_TASK_SUCCESS:
-            return {
-                ...state.tasklist,
-                loading: false,
-                error: null,
-                list: [...state.tasklist.list, action.payload],
-            };
         case DELETE_TASK:
             return {
-                // ...state.tasklist,
                 loading: false,
                 error: null,
                 currentItemsPart: 1,

@@ -1,14 +1,18 @@
 import React, {useState, useEffect} from "react";
-import {Icon, Menu, Table, Input, Loader, Dimmer} from "semantic-ui-react";
+import {Icon, Menu, Table, Input, Loader} from "semantic-ui-react";
+import {useIntl} from 'react-intl';
 import ModalCompleteContainer from "../../containers/ModalCompleteContainer/ModalCompleteContainer";
-import ModalCreateContainer from "../../containers/ModalCreateContainer/ModalCreateContainer";
+import ModalChooseProcessContainer from "../../containers/ModalChooseProcessContainer/ModalChooseProcessContainer";
 import {outputAmountString} from "../../utils/outputAmountString";
+import {messages} from './TasklistTableMessages';
 
-const TasklistTable = ({loading, list, currentItemsPart, setCurrentItemsPart, currentPartsPortion}) => {
+const TasklistTable = ({loading, list, currentItemsPart, setCurrentItemsPart, currentPartsPortion, location}) => {
     const [filterValue, setFilterValue] = useState('');
     useEffect(() => {
         setCurrentItemsPart(1, 1);
     }, [filterValue, setCurrentItemsPart]);
+
+    const intl = useIntl();
 
     let parts = [];
     const itemsPerPart = 5;
@@ -62,7 +66,6 @@ const TasklistTable = ({loading, list, currentItemsPart, setCurrentItemsPart, cu
 
     const renderCells = (task, i) => {
         let processDefinition = task.processDefinitionId.substring(0, task.processDefinitionId.indexOf(':'));
-        let formattedProcessDefinition = processDefinition.split('_').join(' ');
         let amount;
         if (task.warrantyAmount) {
             amount = outputAmountString(task.warrantyAmount.value);
@@ -70,15 +73,15 @@ const TasklistTable = ({loading, list, currentItemsPart, setCurrentItemsPart, cu
 
         return (
             <Table.Row key={i}>
+                <Table.Cell>{task.nameFromXml && task.nameFromXml}</Table.Cell>
                 <Table.Cell>{task.name}</Table.Cell>
                 <Table.Cell>{task.customerName && task.customerName.value}</Table.Cell>
-                <Table.Cell>{formattedProcessDefinition[0].toUpperCase() + formattedProcessDefinition.slice(1)}</Table.Cell>
                 <Table.Cell>{task.warrantyAmount && amount}</Table.Cell>
                 <Table.Cell>{task.created && task.created.split('T')[0]}</Table.Cell>
                 <Table.Cell>{task.due && task.due.split('T')[0]}</Table.Cell>
                 <Table.Cell>
                     <ModalCompleteContainer id={task.id} task={task} procDefinitionKey={processDefinition}
-                                            taskDefinitionKey={task.taskDefinitionKey}/>
+                                            taskDefinitionKey={task.taskDefinitionKey} tenantId={task.tenantId}/>
                 </Table.Cell>
             </Table.Row>
         )
@@ -93,8 +96,6 @@ const TasklistTable = ({loading, list, currentItemsPart, setCurrentItemsPart, cu
         if (partsPortionsCount > currentPartsPortion) {
             setCurrentItemsPart(currentPartsPortion * partsPerPortion + 1, currentPartsPortion + 1);
         }
-        //     const nextItemsPart = currentItemsPart + 1;
-        //     nextItemsPart >= itemsPartsCount ? setCurrentItemsPart(itemsPartsCount) : setCurrentItemsPart(nextItemsPart);
     }
     const handleItemsPartClick = (e, part, portion) => {
         e.preventDefault();
@@ -102,31 +103,32 @@ const TasklistTable = ({loading, list, currentItemsPart, setCurrentItemsPart, cu
     }
 
     return (
+        <>
         <div className='TasklistTable'>
             <div className='flexBetween'>
-                <ModalCreateContainer/>
+                <ModalChooseProcessContainer location={location.pathname}/>
                 <Input value={filterValue} onChange={e => setFilterValue(e.target.value.toString())} focus icon='search'
-                       placeholder='Filter by customer'/>
+                       placeholder={intl.formatMessage(messages["filter-placeholder"])}
+                       className='tasklist__filter'/>
             </div>
             <Table>
                 <Table.Header>
                     <Table.Row>
-                        <Table.HeaderCell>Task Name</Table.HeaderCell>
-                        <Table.HeaderCell>Customer</Table.HeaderCell>
-                        <Table.HeaderCell>Process Definition</Table.HeaderCell>
-                        <Table.HeaderCell>Amount</Table.HeaderCell>
-                        <Table.HeaderCell>Created</Table.HeaderCell>
-                        <Table.HeaderCell>Due</Table.HeaderCell>
-                        <Table.HeaderCell>Complete Task</Table.HeaderCell>
+                        <Table.HeaderCell>{intl.formatMessage(messages["table-header-process-definition"])}</Table.HeaderCell>
+                        <Table.HeaderCell>{intl.formatMessage(messages["table-header-taskname"])}</Table.HeaderCell>
+                        <Table.HeaderCell>{intl.formatMessage(messages["table-header-customer"])}</Table.HeaderCell>
+                        <Table.HeaderCell>{intl.formatMessage(messages["table-header-amount"])}</Table.HeaderCell>
+                        <Table.HeaderCell>{intl.formatMessage(messages["table-header-created"])}</Table.HeaderCell>
+                        <Table.HeaderCell>{intl.formatMessage(messages["table-header-due"])}</Table.HeaderCell>
+                        <Table.HeaderCell />
                     </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                    {loading && <Table.Row><Table.Cell>
-                        <Dimmer active inverted>
-                            <Loader inverted size='large'/>
-                        </Dimmer>
-                    </Table.Cell></Table.Row>}
-                    {list && filterCells(list)}
+                    {(list.length > 0) ? filterCells(list) : <Table.Row style={{position: "relative", minHeight: "79px"}}>
+                        <Table.Cell style={{position: "absolute", left: "50%", transform: "translateX(-50%)"}}>
+                            <Loader active inline='centered' size='large'/>
+                    </Table.Cell>
+                    </Table.Row>}
                 </Table.Body>
                 {list && itemsPartsCount > 1 && <Table.Footer>
                     <Table.Row>
@@ -157,6 +159,7 @@ const TasklistTable = ({loading, list, currentItemsPart, setCurrentItemsPart, cu
                 </Table.Footer>}
             </Table>
         </div>
+        </>
     );
 };
 

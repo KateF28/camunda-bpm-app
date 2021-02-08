@@ -5,6 +5,7 @@ import TasklistTable from '../../components/TasklistTable/TasklistTable';
 import compose from '../../utils/compose';
 import withServices from '../../components/hocs/withServices';
 import {getTasklistData, setCurrentItemsPart} from '../../actions/tasklistAction';
+import {createProcessUpdateState} from '../../actions/createProcessAction';
 
 class MakerTasklistPageContainer extends Component {
     componentDidMount() {
@@ -16,14 +17,24 @@ class MakerTasklistPageContainer extends Component {
             this.props.completeTaskError !== nextProps.completeTaskError ||
             this.props.openedTask !== nextProps.openedTask ||
             this.props.xmlData !== nextProps.xmlData ||
-            this.props.isCreated !== nextProps.isCreated ||
+            this.props.processes !== nextProps.processes ||
+            this.props.chooseProcessError !== nextProps.chooseProcessError ||
+            this.props.xmlStartEventData !== nextProps.xmlStartEventData ||
+            // this.props.isCreated !== nextProps.isCreated ||
             this.props.createProcessError !== nextProps.createProcessError);
+    }
+
+    componentDidUpdate(prevProps, prevState, snapshot) {
+        if (this.props.isCreated) {
+            this.props.getTasklistData("Maker");
+            this.props.createProcessUpdateState();
+        }
     }
 
     render() {
         return (
             <Container>
-                <div className='tasklistBody'>
+                <div className='pageBody'>
                     <TasklistTable {...this.props}/>
                 </div>
             </Container>
@@ -33,9 +44,10 @@ class MakerTasklistPageContainer extends Component {
 
 const mapStateToProps = ({
                              tasklist: {list, loading, currentItemsPart, currentPartsPortion},
+                             processesChoose: {chooseProcessError, processes},
                              taskComplete: {isComplete, completeTaskError, xmlData, openedTask},
-                             processCreate: {isCreated, createProcessError}
-}) => {
+                             processCreate: {isCreated, createProcessError, xmlStartEventData}
+                         }) => {
     return {
         list,
         loading,
@@ -45,15 +57,17 @@ const mapStateToProps = ({
         openedTask,
         isComplete,
         completeTaskError,
-        isCreated,
-        createProcessError
+        chooseProcessError,
+        processes,
+        isCreated, createProcessError, xmlStartEventData
     };
 };
 
 const mapDispatchToProps = (dispatch, {services}) => {
     return {
         getTasklistData: assignee => getTasklistData(services, dispatch)(assignee),
-        setCurrentItemsPart: (part, portion) => dispatch(setCurrentItemsPart(part, portion))
+        setCurrentItemsPart: (part, portion) => dispatch(setCurrentItemsPart(part, portion)),
+        createProcessUpdateState: () => dispatch(createProcessUpdateState())
     };
 };
 

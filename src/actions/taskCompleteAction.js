@@ -9,7 +9,7 @@ import {
 } from '../constants/completeTask';
 import {DELETE_TASK} from '../constants/tasklist';
 import {saveAs} from 'file-saver';
-import {Blob} from 'blob-polyfill';
+// import {Blob} from 'blob-polyfill';
 
 const deleteTask = id => {
     return {
@@ -54,18 +54,18 @@ const getXmlSuccess = xml => {
 const postCompleteTask = (service, dispatch) => (id, formData) => {
     dispatch({type: COMPLETE_TASK_REQUEST});
     service.postCompleteTask(id, formData).then(res => {
-        // console.log("postCompleteStatus", res.status)
+        // console.dir(res.status);
         dispatch({type: COMPLETE_TASK_SUCCESS});
         dispatch(deleteTask(id));
     }).catch(err => {
-        // console.log("err", err.data.message);
-        dispatch(completeTaskFailure(err.data));
+        // console.dir(err);
+        err.data ? dispatch(completeTaskFailure(err.data)) : dispatch(completeTaskFailure(err));
     });
 };
 
-const getTaskAppData = (service, dispatch) => (id, fileName) => {
+const getTaskAppData = (service, dispatch) => (id, fileName, fileVariableId) => {
     dispatch({type: COMPLETE_TASK_REQUEST});
-    service.getTaskFileContent(id).then(res => {
+    service.getTaskFileContent(id, fileVariableId).then(res => {
         let blob = new Blob([res.data]);
         saveAs(blob, fileName);
         dispatch({type: GET_FILE_DATA_SUCCESS});
@@ -74,14 +74,14 @@ const getTaskAppData = (service, dispatch) => (id, fileName) => {
     });
 };
 
-const getXml = (service, dispatch) => (procDefinitionKey, taskDefinitionKey) => {
+const getXml = (service, dispatch) => (procDefinitionKey, taskDefinitionKey, tenantId) => {
     dispatch({type: COMPLETE_TASK_REQUEST});
-    service.getXml(procDefinitionKey).then(res => {
-        // console.log("getXml response", res.data.bpmn20Xml);
-        let oParser = new DOMParser();
-        let oDOM = oParser.parseFromString(res.data.bpmn20Xml, "application/xml");
-        let taskFormData = [...oDOM.documentElement.firstElementChild.children]
-            .filter(el => el.nodeName === "bpmn:userTask" && el.id === taskDefinitionKey)[0].children;
+    service.getXml(procDefinitionKey, tenantId).then(res => {
+        const oParser = new DOMParser();
+        const oXML = oParser.parseFromString(res.data.bpmn20Xml, "application/xml");
+        const tasksData = Array.from(oXML.documentElement.firstElementChild.childNodes).filter(el => el.nodeName === "bpmn:userTask");
+        const taskFormData = tasksData.find(el => Array.from(el.attributes)
+            .find(elem => elem.nodeName === "id" && elem.nodeValue === taskDefinitionKey)).childNodes;
         dispatch(getXmlSuccess(taskFormData));
     }).catch(err => {
         err.data ? dispatch(completeTaskFailure(err.data)) : dispatch(completeTaskFailure(err));

@@ -19,13 +19,13 @@ class Services {
     getTasksVariables = tasks => {
         const fetchInfo = async (url, id) => {
             const info = await axios.get(url);
-                        const task = {id};
+            const task = {id};
             for (let key in info.data) {
                 if (info.data.hasOwnProperty(key)) {
                     task[key] = info.data[key];
                 }
             }
-            return task
+            return task;
         }
 
         const fetchTaskInfo = async (taskIds) => {
@@ -50,12 +50,46 @@ class Services {
         // });
     }
 
+    getTasksXml = tasks => {
+        const fetchXmlInfo = async (url, id) => {
+                const info = await axios.get(url);
+                const oParser = new DOMParser();
+                const taskXmlData = oParser.parseFromString(info.data.bpmn20Xml, "application/xml").documentElement;
+                return {id, taskXmlData};
+        }
+
+        const fetchTaskInfo = async (arr) => {
+            const requests = arr.map(item => {
+                const url = item.tenantId ? this._baseUrl + `engine/default/process-definition/key/${item.processKey}/tenant-id/${item.tenantId}/xml`
+                    : this._baseUrl + `engine/default/process-definition/key/${item.processKey}/xml`;
+                return fetchXmlInfo(url, item.id).then((res) => res);
+            })
+            return Promise.all(requests);
+        }
+
+        let arrayOfProcessKeysAndTasksIds = [];
+        tasks.forEach(task => {
+            let processKey = task.processDefinitionId.substring(0, task.processDefinitionId.indexOf(':'));
+            arrayOfProcessKeysAndTasksIds.push({processKey, id: task.id, tenantId: task.tenantId});
+        });
+        return fetchTaskInfo(arrayOfProcessKeysAndTasksIds).then(res => res);
+    }
+
+    getXml = (processKey, tenantId) => {
+        return axios.get(tenantId ? this._baseUrl + `engine/default/process-definition/key/${processKey}/tenant-id/${tenantId}/xml`
+            : this._baseUrl + `engine/default/process-definition/key/${processKey}/xml`).catch(error => {
+            const err = (new Error('Something went wrong'));
+            err.data = error;
+            throw err;
+        })
+    }
+
     postCompleteTask = (id, formData) => {
-        const completeTaskReqBodyVars = {};
+        const variables = {};
         formData.forEach(el => {
             if (el.type === "file") {
                 if (!el.isFile && el.fileName !== "") {
-                    completeTaskReqBodyVars[el.id] = {
+                    variables[el.id] = {
                         value: el.value,
                         type: el.type,
                         valueInfo: {
@@ -66,19 +100,77 @@ class Services {
                 }
             } else if (el.type === "enum") {
                 if (el.value !== "") {
-                    completeTaskReqBodyVars[el.id] = {value: el.value, type: "string"}; // +long +double
+                    variables[el.id] = {value: el.value, type: "string"};
                 }
             } else if (el.type === "string") {
                 if (el.value !== "") {
-                    completeTaskReqBodyVars[el.id] = {value: el.value.trim(), type: el.type};
+                    variables[el.id] = {value: el.value.trim(), type: el.type};
                 }
+            } else if (el.type === "long" || el.type === "double") {
+                if (el.value !== "") {
+                    variables[el.id] = {value: Number(el.value), type: el.type};
+                }
+            } else if (el.type === "date") {
+                const dateArray = el.value.split('-');
+                variables[el.id] = {value: `${dateArray[2]}-${dateArray[1]}-${dateArray[0]}T00:00:00.000+0000`, type: el.type};
             } else {
-                completeTaskReqBodyVars[el.id] = {value: el.value, type: el.type};
+                variables[el.id] = {value: el.value, type: el.type};
             }
         });
-        // console.log("completeReqBodyVars", completeTaskReqBodyVars)
-        return axios.post(this._baseUrl + `engine/default/task/${id}/complete`, {
-            variables: completeTaskReqBodyVars
+        // console.dir(variables)
+        return axios.post(this._baseUrl + `engine/default/task/${id}/complete`, {variables}).catch(error => {
+            const err = (new Error('Something went wrong'));
+            err.data = error;
+            throw err;
+        })
+    }
+
+    getProcessesList = () => {
+        return axios.get(this._baseUrl + 'engine/default/process-definition?latestVersion=true').catch(error => {
+            const err = (new Error('Something went wrong'));
+            err.data = error;
+            throw err;
+        })
+    }
+
+    postCreateProcess = (formData, processKey, businessKey) => {
+        const variables = {};
+        formData.forEach(el => {
+            if (el.type === "file") {
+                if (el.fileName !== "") {
+                    variables[el.id] = {
+                        value: el.value,
+                        type: el.type,
+                        valueInfo: {
+                            filename: el.fileName,
+                            encoding: "Base64"
+                        }
+                    };
+                }
+            } else if (el.type === "enum") {
+                if (el.value !== "") {
+                    variables[el.id] = {value: el.value, type: "string"};
+                }
+            } else if (el.type === "string") {
+                if (el.value !== "") {
+                    variables[el.id] = {value: el.value.trim(), type: el.type};
+                }
+            } else if (el.type === "long" || el.type === "double") {
+                if (el.value !== "") {
+                    variables[el.id] = {value: Number(el.value), type: el.type};
+                }
+            } else if (el.type === "date") {
+                const dateArray = el.value.split('-');
+                variables[el.id] = {value: `${dateArray[2]}-${dateArray[1]}-${dateArray[0]}T00:00:00.000+0000`, type: el.type};
+            } else {
+                variables[el.id] = {value: el.value, type: el.type};
+            }
+        });
+        // console.dir(variables);
+        return axios.post(this._baseUrl + `engine/default/process-definition/key/${processKey}/start`, {
+            variables,
+            businessKey,
+            withVariablesInReturn: true
         }).catch(error => {
             const err = (new Error('Something went wrong'));
             err.data = error;
@@ -86,62 +178,16 @@ class Services {
         })
     }
 
-    getXml = processKey => {
-        return axios.get(this._baseUrl + `process-definition/key/${processKey}/xml`).catch(error => {
-            const err = (new Error('Something went wrong'));
-            err.data = error;
-            throw err;
-        })
-    }
+    // getTaskData = id => {
+    //     return axios.get(this._baseUrl + `engine/default/task?processInstanceId=${id}`).catch(error => {
+    //         const err = (new Error('Something went wrong'));
+    //         err.data = error;
+    //         throw err;
+    //     })
+    // }
 
-    postCreateProcess = ({amount, customerName, fileValue, fileName}, processKey, businessKey) => {
-        let requestBody;
-        if (fileName) {
-            requestBody = {
-                variables:
-                    {
-                        customerName: {value: customerName, type: "String"},
-                        warrantyAmount: {value: amount, type: "Long"},
-                        warrantyApplication: {
-                            value: fileValue,
-                            type: "file",
-                            valueInfo: {
-                                filename: fileName,
-                                encoding: "Base64"
-                            }
-                        }
-                    },
-                businessKey,
-                withVariablesInReturn: true
-            }
-        } else {
-            requestBody = {
-                variables:
-                    {
-                        customerName: {value: customerName, type: "String"},
-                        warrantyAmount: {value: amount, type: "Long"}
-                    },
-                businessKey,
-                withVariablesInReturn: true
-            }
-        }
-        return axios.post(this._baseUrl + `engine/default/process-definition/key/${processKey}/start`, requestBody).catch(error => {
-            const err = (new Error('Something went wrong'));
-            err.data = error;
-            throw err;
-        })
-    }
-
-    getTaskData = id => {
-        return axios.get(this._baseUrl + `engine/default/task?processInstanceId=${id}`).catch(error => {
-            const err = (new Error('Something went wrong'));
-            err.data = error;
-            throw err;
-        })
-    }
-
-    getTaskFileContent = id => {
-        return axios.get(this._baseUrl + `engine/default/task/${id}/variables/warrantyApplication/data`, {
+    getTaskFileContent = (id, fileVariableId) => {
+        return axios.get(this._baseUrl + `engine/default/task/${id}/variables/${fileVariableId}/data`, {
             responseType: 'arraybuffer'
         }).catch(error => {
             const err = (new Error('Something went wrong'));
